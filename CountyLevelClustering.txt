@@ -1,0 +1,458 @@
+## County-Level Longitudinal Clustering of COVID-19 Mortality to Incidence Ratio in the United States ##
+
+# Packages
+library(geepack)
+library(tidyr) 
+library(nlme) 
+library(lme4) 
+library(lmerTest) 
+library(parallelMap)
+library(parallel)
+library(MASS) 
+require(foreign)
+require(nnet)
+require(ggplot2)
+require(reshape2)
+
+# Data
+dat.mir = read.csv("(Data)_CountyLevelClustering.csv", sep = ",")
+dat.mir$countyFIPS = as.factor(dat.mir$countyFIPS)
+dat.mir$stateFIPS = as.factor(dat.mir$stateFIPS)
+
+dat.mir = dat.mir[order(dat.mir$stateFIPS, dat.mir$countyFIPS), ] #Sort
+
+dat.long.mir = gather(dat.mir, time, y, w9:w19, factor_key=TRUE) #Re-shape 
+dat.long.mir = dat.long.mir[order(dat.long.mir$stateFIPS, dat.long.mir$countyFIPS), ]
+
+levels(dat.long.mir$time) <- c(1:12) #Time
+dat.long.mir$time2 = as.numeric(as.character(dat.long.mir$time))
+
+# Descriptive:
+summary(dat.long.mir)
+
+# Pairwise t-test (between time points)
+t.test(dat.mir$w10, dat.mir$w9)
+t.test(dat.mir$w11, dat.mir$w10)
+t.test(dat.mir$w12, dat.mir$w11)
+t.test(dat.mir$w13, dat.mir$w12)
+t.test(dat.mir$w14, dat.mir$w13)
+t.test(dat.mir$w15, dat.mir$w14)
+t.test(dat.mir$w16, dat.mir$w15)
+t.test(dat.mir$w17, dat.mir$w16)
+t.test(dat.mir$w18, dat.mir$w17)
+t.test(dat.mir$w19, dat.mir$w18)
+
+## GEE Models ----
+# "Response variable (y)": is COVID-19 MIR at each time-point for each county
+# "Independent variables (Xs)": are all the potential risk factors (n=34)
+# Univariate GEEs
+age = geeglm(y ~ time2 + mean_age,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x1 = cbind(summary(age)$coeff[1], summary(age)$coeff[4])
+
+
+mblack=geeglm(y ~ time2 + ProMBlack,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x2 = cbind(summary(mblack)$coeff[1], summary(mblack)$coeff[4])
+
+
+ProFBlack= geeglm(y ~ time2 + dat.long.mir$ProFBlack,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x3 = cbind(summary(ProFBlack)$coeff[1], summary(ProFBlack)$coeff[4])
+
+
+ProMWhite=geeglm(y ~ time2 + dat.long.mir$ProMWhite,
+                 family=gaussian,
+                 data=dat.long.mir, 
+                 id=countyFIPS, 
+                 corstr = "exchangeable", 
+                 std.err="san.se")
+x4 = cbind(summary(ProMWhite)$coeff[1], summary(ProMWhite)$coeff[4])
+
+ProFWhite=geeglm(y ~ time2 + dat.long.mir$ProFWhite,
+                 family=gaussian,
+                 data=dat.long.mir, 
+                 id=countyFIPS, 
+                 corstr = "exchangeable", 
+                 std.err="san.se")
+x5 = cbind(summary(ProFWhite)$coeff[1], summary(ProFWhite)$coeff[4])
+
+
+XSmokers=geeglm(y ~ time2 + dat.long.mir$XSmokers,
+                family=gaussian,
+                data=dat.long.mir, 
+                id=countyFIPS, 
+                corstr = "exchangeable", 
+                std.err="san.se")
+x6 = cbind(summary(XSmokers)$coeff[1], summary(XSmokers)$coeff[4])
+
+
+XUninsured=geeglm(y ~ time2 + dat.long.mir$XUninsured,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x7 = cbind(summary(XUninsured)$coeff[1], summary(XUninsured)$coeff[4])
+
+
+Unemployed=geeglm(y ~ time2 + dat.long.mir$Unemployed,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x8 = cbind(summary(Unemployed)$coeff[1], summary(Unemployed)$coeff[4])
+
+
+Income_Rt=geeglm(y ~ time2 + dat.long.mir$Income_Rt,
+                 family=gaussian,
+                 data=dat.long.mir, 
+                 id=countyFIPS, 
+                 corstr = "exchangeable", 
+                 std.err="san.se")
+x9 = cbind(summary(Income_Rt)$coeff[1], summary(Income_Rt)$coeff[4])
+
+
+XAsian=geeglm(y ~ time2 + dat.long.mir$XAsian,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x10 = cbind(summary(XAsian)$coeff[1], summary(XAsian)$coeff[4])
+
+
+Ischemic=geeglm(y ~ time2 + dat.long.mir$Ischemic,
+                family=gaussian,
+                data=dat.long.mir, 
+                id=countyFIPS, 
+                corstr = "exchangeable", 
+                std.err="san.se")
+x11 = cbind(summary(Ischemic)$coeff[1], summary(Ischemic)$coeff[4])
+
+
+Cerebrovas=geeglm(y ~ time2 + dat.long.mir$Cerebrovas,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x12 = cbind(summary(Cerebrovas)$coeff[1], summary(Cerebrovas)$coeff[4])
+
+
+Hypertensi=geeglm(y ~ time2 + dat.long.mir$Hypertensi,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x13 = cbind(summary(Hypertensi)$coeff[1], summary(Hypertensi)$coeff[4])
+
+
+Cardiomyop=geeglm(y ~ time2 + dat.long.mir$Cardiomyop,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x14 = cbind(summary(Cardiomyop)$coeff[1], summary(Cardiomyop)$coeff[4])
+
+
+Atrial=geeglm(y ~ time2 + dat.long.mir$Atrial,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x15 = cbind(summary(Atrial)$coeff[1], summary(Atrial)$coeff[4])
+
+
+Peripheral=geeglm(y ~ time2 + dat.long.mir$Peripheral,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x16 = cbind(summary(Peripheral)$coeff[1], summary(Peripheral)$coeff[4])
+
+
+Alcohol_di=geeglm(y ~ time2 + dat.long.mir$Alcohol_di,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x17 = cbind(summary(Alcohol_di)$coeff[1], summary(Alcohol_di)$coeff[4])
+
+
+Drug_disor=geeglm(y ~ time2 + dat.long.mir$Drug_disor,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x18 = cbind(summary(Drug_disor)$coeff[1], summary(Drug_disor)$coeff[4])
+
+
+Tuberculos=geeglm(y ~ time2 + dat.long.mir$Tuberculos,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x19 = cbind(summary(Tuberculos)$coeff[1], summary(Tuberculos)$coeff[4])
+
+
+HIV_AIDS=geeglm(y ~ time2 + dat.long.mir$HIV_AIDS,
+                family=gaussian,
+                data=dat.long.mir, 
+                id=countyFIPS, 
+                corstr = "exchangeable", 
+                std.err="san.se")
+x20 = cbind(summary(HIV_AIDS)$coeff[1], summary(HIV_AIDS)$coeff[4])
+
+
+LRI=geeglm(y ~ time2 + dat.long.mir$LRI,
+           family=gaussian,
+           data=dat.long.mir, 
+           id=countyFIPS, 
+           corstr = "exchangeable", 
+           std.err="san.se")
+x21 = cbind(summary(LRI)$coeff[1], summary(LRI)$coeff[4])
+
+
+Hepatitis=geeglm(y ~ time2 + dat.long.mir$Hepatitis,
+                 family=gaussian,
+                 data=dat.long.mir, 
+                 id=countyFIPS, 
+                 corstr = "exchangeable", 
+                 std.err="san.se")
+x22 = cbind(summary(Hepatitis)$coeff[1], summary(Hepatitis)$coeff[4])
+
+
+COPD=geeglm(y ~ time2 + dat.long.mir$COPD,
+            family=gaussian,
+            data=dat.long.mir, 
+            id=countyFIPS, 
+            corstr = "exchangeable", 
+            std.err="san.se")
+x23 = cbind(summary(COPD)$coeff[1], summary(COPD)$coeff[4])
+
+
+Asthma=geeglm(y ~ time2 + dat.long.mir$Asthma,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x24 = cbind(summary(Asthma)$coeff[1], summary(Asthma)$coeff[4])
+
+
+Interstiti=geeglm(y ~ time2 + dat.long.mir$Interstiti,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x25 = cbind(summary(Interstiti)$coeff[1], summary(Interstiti)$coeff[4])
+
+
+AVG_AQI=geeglm(y ~ time2 + dat.long.mir$AVG_AQI,
+               family=gaussian,
+               data=dat.long.mir, 
+               id=countyFIPS, 
+               corstr = "exchangeable", 
+               std.err="san.se")
+x26 = cbind(summary(AVG_AQI)$coeff[1], summary(AVG_AQI)$coeff[4])
+
+
+AVG_PM=geeglm(y ~ time2 + dat.long.mir$AVG_PM,
+              family=gaussian,
+              data=dat.long.mir, 
+              id=countyFIPS, 
+              corstr = "exchangeable", 
+              std.err="san.se")
+x27 = cbind(summary(AVG_PM)$coeff[1], summary(AVG_PM)$coeff[4])
+
+
+tavg = geeglm(y ~ time2 + dat.long.mir$tavg,
+            family=gaussian,
+            data=dat.long.mir, 
+            id=countyFIPS, 
+            corstr = "exchangeable", 
+            std.err="san.se")
+x28 = cbind(summary(tavg)$coeff[1], summary(tavg)$coeff[4])
+
+
+Pancreatic=geeglm(y ~ time2 + dat.long.mir$Pancreatic,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x29 = cbind(summary(Pancreatic)$coeff[1], summary(Pancreatic)$coeff[4])
+
+
+Tracheal = geeglm(y ~ time2 + dat.long.mir$Tracheal,
+                family=gaussian,
+                data=dat.long.mir, 
+                id=countyFIPS, 
+                corstr = "exchangeable", 
+                std.err="san.se")
+x30 = cbind(summary(Tracheal)$coeff[1], summary(Tracheal)$coeff[4])
+
+
+Mesothelio = geeglm(y ~ time2 + dat.long.mir$Mesothelio,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x31 = cbind(summary(Mesothelio)$coeff[1], summary(Mesothelio)$coeff[4])
+
+
+Leukemia = geeglm(y ~ time2 + dat.long.mir$Leukemia,
+                family=gaussian,
+                data=dat.long.mir, 
+                id=countyFIPS, 
+                corstr = "exchangeable", 
+                std.err="san.se")
+x32 = cbind(summary(Leukemia)$coeff[1], summary(Leukemia)$coeff[4])
+
+
+Cardiovasc = geeglm(y ~ time2 + dat.long.mir$Cardiovasc,
+                  family=gaussian,
+                  data=dat.long.mir, 
+                  id=countyFIPS, 
+                  corstr = "exchangeable", 
+                  std.err="san.se")
+x33 = cbind(summary(Cardiovasc)$coeff[1], summary(Cardiovasc)$coeff[4])
+
+
+Rheumatic = geeglm(y ~ time2 + dat.long.mir$Rheumatic,
+                 family=gaussian,
+                 data=dat.long.mir, 
+                 id=countyFIPS, 
+                 corstr = "exchangeable", 
+                 std.err="san.se")
+x34 = cbind(summary(Rheumatic)$coeff[1], summary(Rheumatic)$coeff[4])
+
+
+time2 = geeglm(y ~ dat.long.mir$time2,
+             family=gaussian,
+             data=dat.long.mir, 
+             id=countyFIPS, 
+             corstr = "exchangeable", 
+             std.err="san.se")
+x0 = cbind(summary(time2)$coeff[1], summary(time2)$coeff[4])
+
+rb = rbind(x0,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,
+           x29,x30,x31,x32,x33,x34)
+
+# Multivariate GEE
+gee.mir.exch.timeCont <- geeglm(y ~ time2 + mean_age + ProMBlack +	ProFBlack +	ProMWhite +	ProFWhite +	XSmokers +	XUninsured	+  Unemployed +	Income_Rt +	XAsian +
+                                  Cardiovasc + Cerebrovas + Hypertensi +	Cardiomyop +	Atrial +	Peripheral +
+                                  Ischemic +	Pancreatic + Tracheal +	Mesothelio +
+                                  Alcohol_di +	Drug_disor +
+                                  Tuberculos + HIV_AIDS +	LRI +	Hepatitis +	Interstiti +	
+                                  AVG_AQI +	AVG_PM +	tavg,
+                                family=gaussian,
+                                data=dat.long.mir, 
+                                id=countyFIPS, 
+                                corstr = "exchangeable", 
+                                std.err="san.se")
+summary(gee.mir.exch.timeCont)
+
+## Multinomial Model ----
+# "Response variable (y)": is the class-membership with 9 categories (class0-class8)
+# "Independent variables (Xs)": are the selected potential risk factors from the univariate-GEE (forward variable selection)
+cluster_number = c(1:8)
+my_multinom = multinom(Cluster ~ Cardiovasc + Cardiomyop +	Hypertensi +	Peripheral +	Atrial +	Cerebrovas +
+                  Hepatitis +	HIV_AIDS +	Tuberculos + LRI +	Interstiti +
+                  Ischemic + Mesothelio + Tracheal + Pancreatic +
+                  Drug_disor +   Alcohol_di +	
+                  mean_age + ProFBlack +	ProFWhite +	ProMBlack +	ProMWhite + XAsian +	XSmokers + Unemployed +	Income_Rt +	XUninsured	+
+                  AVG_AQI +	tavg + AVG_PM,
+                data = dat.mir)
+coeff = cbind(cluster_number, summary(my_multinom)$coefficients[, -1]); coeff = as.data.frame(coeff)
+sd = cbind(cluster_number, summary(my_multinom)$standard.errors[, -1]); sd = as.data.frame(sd)
+z = summary(my_multinom)$coefficients/summary(my_multinom)$standard.errors; z2 = cbind(cluster_number, z[, -1]); z2 = as.data.frame(z2)
+p = (1 - pnorm(abs(z), 0, 1)) * 2; p = p[, -1]; p = cbind(cluster_number, p); p = as.data.frame(p)
+rr = cbind(cluster_number, exp(coef(my_multinom))[, -1]); rr = as.data.frame(rr)
+
+
+coeff.long = gather(coeff, X, beta, Cardiovasc:AVG_PM, factor_key=TRUE)
+sd.long = gather(sd, X, sd, Cardiovasc:AVG_PM, factor_key=TRUE)
+z.long = gather(z2, X, z, Cardiovasc:AVG_PM, factor_key=TRUE)
+p.long = gather(p, X, pvalue, Cardiovasc:AVG_PM, factor_key=TRUE)
+rr.long = gather(rr, X, RR, Cardiovasc:AVG_PM, factor_key=TRUE)
+merged = cbind(coeff.long, sd.long[,3], rr.long[,3], z.long[,3], p.long[,3])
+
+###############################################################################################################################################################
+# Latent Growth Mixture Models (LGMMs)
+# To be ran in M-Pluse
+# This is the code for an 8-class model. To run the model with different cluster numbers, only adjust: "c(X")", and "%C#X%".
+# "(Data2)_CountyLevelClustering.csv":
+	# Columns = FIPS,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19
+	# Rows= Counties with at least one death during the study time (MIR>0)
+	# Data must have no col-names and/or row-names
+
+DATA: FILE = C:\Users\user\Desktop\(Data2)_CountyLevelClustering.csv;
+VARIABLE: NAMES = fips w9-w19;
+MISSING = ALL (-9);
+USEVAR = w9-w19;
+CLASSES=C(8);
+
+ANALYSIS:
+TYPE = mixture;
+STARTS = 1000 250;
+STITERATIONS = 10;
+LRTBOOTSTRAP = 500;
+LRTSTARTS =0 0 100 25;
+PROCESSORS = 8(STARTS);
+
+MODEL:
+%overall%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#1%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#2%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#3%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#4%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#5%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#6%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+
+%C#7%
+eta0 eta1|w9@0 w10* w11* w12* w13* w14* w15* w16* w17* w18* w19*;
+;
+OUTPUT: TECH11 TECH14 SAMPSTAT STDYX;
+  Savedata:
+          File is "C:\Users\user\Desktop\GLMM_8Cluster.csv;
+PLOT: TYPE = PLOT3;
+Series = w9-w19(*);
+###############################################################################################################################################################
+  
